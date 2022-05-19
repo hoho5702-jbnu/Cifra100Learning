@@ -22,8 +22,10 @@ with tf.device('/device:GPU:0'):
     batch_size = 128
     n_epoch = 50
     k = 5
+    num_model = 0
 
     def cross_validation(data_gen, dropout_rate, l2_reg):
+        global num_model
         accuracy = []
         for train_index, val_index in KFold(k).split(x_train):
             xtrain, xval = x_train[train_index], x_train[val_index]
@@ -61,22 +63,23 @@ with tf.device('/device:GPU:0'):
 
             if data_gen:
                 generator = ImageDataGenerator(rotation_range=3.0, width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
-                cnn.fit_generator(generator.flow(x_train, y_train, batch_size=batch_size), epochs=n_epoch, validation_data=(x_test, y_test),
+                cnn.fit_generator(generator.flow(xtrain, ytrain, batch_size=batch_size), epochs=n_epoch, validation_data=(x_test, y_test),
                         verbose=2, callbacks=[early_stop])
             else:
                 cnn.fit(xtrain, ytrain, batch_size=batch_size, epochs=n_epoch, validation_data=(x_test, y_test), verbose=2,
                         callbacks=[early_stop])
             accuracy.append(cnn.evaluate(xval, yval, verbose=0)[1])
+            if num_model == 0:
+                cnn.save("my_cnn.h5")
+        num_model += 1
 
         return accuracy
 
-    acc_000 = cross_validation(False, [0.0, 0.0, 0.0, 0.0, 0.0], 0.0)
     acc_001 = cross_validation(True, [0.0, 0.0, 0.0, 0.0, 0.0], 0.0)
     acc_010 = cross_validation(True, [0.2, 0.5, 0.5, 0.5, 0.5], 0.0)
     acc_011 = cross_validation(True, [0.2, 0.5, 0.5, 0.5, 0.5], 0.01)
 
     print("출력형식 : [Data augmentation-Dropout-l2 reg] (교차검증 시도/평균)")
-    print("[000] (", acc_000, "/", np.array(acc_000).mean(), ")")
     print("[001] (", acc_001, "/", np.array(acc_001).mean(), ")")
     print("[010] (", acc_010, "/", np.array(acc_010).mean(), ")")
     print("[011] (", acc_011, "/", np.array(acc_011).mean(), ")")
@@ -84,8 +87,8 @@ with tf.device('/device:GPU:0'):
     import matplotlib.pyplot as plt
 
     plt.grid()
-    plt.boxplot([acc_000, acc_001, acc_010]
-                , labels = ["000", "001", "010"])
+    plt.boxplot([acc_001, acc_010, acc_011]
+                , labels = ["001", "010", "011"])
     plt.show()
-    plt.savefig('myfigure.pdf', dpi = 200)
+    plt.savefig('myfigure.png', dpi = 200)
     sys.stdout.close()
